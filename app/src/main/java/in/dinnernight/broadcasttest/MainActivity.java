@@ -4,6 +4,7 @@ import android.app.ActionBar;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
+import android.location.LocationManager;
 import android.os.Handler;
 import android.support.v4.app.FragmentActivity;
 import android.support.v7.app.ActionBarActivity;
@@ -32,12 +33,17 @@ import java.util.List;
 import android.app.FragmentManager;
 import android.app.ListFragment;
 import android.widget.TextView;
+import android.widget.Toast;
 
 public class MainActivity extends FragmentActivity implements View.OnClickListener {
     public final static String EXTRA_MESSAGE = "MESSAGE";
     private ListView obj;
     DBHelper mydb;
     private Intent intent;
+    protected LocationManager locationManager;
+    boolean isGPSEnabled = false;
+    boolean isNetworkEnabled = false;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,9 +55,11 @@ public class MainActivity extends FragmentActivity implements View.OnClickListen
         b1.setOnClickListener(this);
         Button b2 = (Button) findViewById(R.id.start);
         b2.setOnClickListener(this);
+        Button b3 = (Button) findViewById(R.id.stop);
+        b3.setOnClickListener(this);
+        b3.setClickable(false);
         mydb = new DBHelper(this);
-        ArrayList array_list = mydb.getAllCotacts();
-        ArrayAdapter arrayAdapter=new ArrayAdapter(this,android.R.layout.simple_list_item_1, array_list);
+
 
 
 
@@ -95,20 +103,65 @@ public class MainActivity extends FragmentActivity implements View.OnClickListen
     @Override
     public void onResume() {
         super.onResume();
-
-        //  registerReceiver(broadcastReceiver, new IntentFilter(BroadcastService.BROADCAST_ACTION));
     }
 
     @Override
     public void onClick(View v) {
+        Context context = getApplicationContext();
+        int duration = Toast.LENGTH_SHORT;
         if(v.getId()==R.id.Add) {
             Intent intent = new Intent(this, DisplayContact.class);
             startActivity(intent);
         }
 
         if(v.getId()==R.id.start){
+            locationManager = (LocationManager)getSystemService(LOCATION_SERVICE);
+
+            // getting GPS status
+            isGPSEnabled = locationManager
+                    .isProviderEnabled(LocationManager.GPS_PROVIDER);
+
+            // getting network status
+            isNetworkEnabled = locationManager
+                    .isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+
+            if(!isNetworkEnabled)
+            {
+                CharSequence text = "Please enable network";
+                Toast toast = Toast.makeText(context, text, duration);
+                toast.show();
+            }
+            else{
+                if(!isGPSEnabled)
+                {
+                    CharSequence text = "Please enable gps";
+                    Toast toast = Toast.makeText(context, text, duration);
+                    toast.show();
+                }
+                else
+                {
+                    intent = new Intent(this, BroadcastService.class);
+                    startService(intent);
+                    Button b3 = (Button) findViewById(R.id.stop);
+
+                    b3.setClickable(true);
+
+                    CharSequence text = "Service started succesfully!!";
+                    Toast toast = Toast.makeText(context, text, duration);
+                    toast.show();
+                }
+
+            }
+
+        }
+
+        if(v.getId()==R.id.stop){
             intent = new Intent(this, BroadcastService.class);
-            startService(intent);
+            stopService(intent);
+            CharSequence text = "Service stopped";
+            Toast toast = Toast.makeText(context, text, duration);
+            toast.show();
+
         }
     }
 

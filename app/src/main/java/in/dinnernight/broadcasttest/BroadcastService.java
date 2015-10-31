@@ -20,7 +20,6 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
-import android.os.Vibrator;
 import android.telephony.SmsManager;
 import android.util.Log;
 import android.widget.Toast;
@@ -28,6 +27,8 @@ import android.widget.Toast;
 
 public class BroadcastService extends Service implements SensorEventListener, LocationListener {
     private DBHelper mydb ;
+
+    //Empty constructor
     public BroadcastService()
     {
 
@@ -46,9 +47,7 @@ public class BroadcastService extends Service implements SensorEventListener, Lo
     private float deltaY = 0;
     private float deltaZ = 0;
 
-    private float vibrateThreshold = 0;
 
-    private final Context mContext = null;
 
 
     boolean isGPSEnabled = false;
@@ -66,12 +65,12 @@ public class BroadcastService extends Service implements SensorEventListener, Lo
     private static final long MIN_DISTANCE_CHANGE_FOR_UPDATES = 10; // 10 meters
 
     // The minimum time between updates in milliseconds
-    private static final long MIN_TIME_BW_UPDATES = 1000 * 60 * 1; // 1 minute
+    private static final long MIN_TIME_BW_UPDATES = 1000 * 60 ; // 1 minute
 
     // Declaring a Location Manager
     protected LocationManager locationManager;
 
-    public Vibrator v;
+
 
     private static final String TAG = "BroadcastService";
     public static final String BROADCAST_ACTION = "in.dinnernight.broadcasttest.displayevent";
@@ -90,35 +89,45 @@ public class BroadcastService extends Service implements SensorEventListener, Lo
 
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         if (sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null) {
-            // success! we have an accelerometer
+
 
             accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
             sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
-            // vibrateThreshold = accelerometer.getMaximumRange() / 2;
-        } else {
-            // fai! we dont have an accelerometer!
+
         }
 
-        //initialize vibration
-        v = (Vibrator) this.getSystemService(Context.VIBRATOR_SERVICE);
+
     }
+
 
     @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.i("LocalService", "Received start id " + startId + ": " + intent);
-        handler.removeCallbacks(sendUpdatesToUI);
-        handler.postDelayed(sendUpdatesToUI, 1000); // 1 second
+    public void onSensorChanged(SensorEvent event) {
+        // get the change of the x,y,z values of the accelerometer
+        float x=event.values[0];
+        float y=event.values[1];
+        float z=event.values[2];
 
-        return START_NOT_STICKY;
-    }
+        deltaX = Math.abs(lastX - x);
+        deltaY = Math.abs(lastY - y);
+        deltaZ = Math.abs(lastZ - z);
 
+        // if the change is below 2, it is just plain noise
+        if (deltaX < 2)
+            deltaX = 0;
+        if (deltaY < 2)
+            deltaY = 0;
+        if (deltaZ < 10)
+            deltaZ = 0;
 
-    private Runnable sendUpdatesToUI = new Runnable() {
-        public void run() {
-
-            handler.postDelayed(this, 10000); // 10 seconds
+        if(deltaX >50 || deltaY>50 || deltaZ >50) {
+            DisplayLoggingInfo();
         }
-    };
+
+        lastX=x;
+        lastY=y;
+        lastZ=z;
+
+    }
 
     private void DisplayLoggingInfo() {
         Log.d(TAG, "entered DisplayLoggingInfo");
@@ -152,144 +161,6 @@ public class BroadcastService extends Service implements SensorEventListener, Lo
 
         sendBroadcast(intent);
     }
-
-
-    @Override
-    public void onDestroy() {
-        handler.removeCallbacks(sendUpdatesToUI);
-        super.onDestroy();
-    }
-
-
-
-
-
-
-
-
-    @Override
-
-    public IBinder onBind(Intent intent) {
-        // TODO: Return the communication channel to the service.
-        throw new UnsupportedOperationException("Not yet implemented");
-    }
-
-    @Override
-    public void onSensorChanged(SensorEvent event) {
-        // get the change of the x,y,z values of the accelerometer
-        float x=event.values[0];
-        float y=event.values[1];
-        float z=event.values[2];
-
-        deltaX = Math.abs(lastX - x);
-        deltaY = Math.abs(lastY - y);
-        deltaZ = Math.abs(lastZ - z);
-
-        // if the change is below 2, it is just plain noise
-        if (deltaX < 2)
-            deltaX = 0;
-        if (deltaY < 2)
-            deltaY = 0;
-        if (deltaZ < 10)
-            deltaZ = 0;
-
-        if(deltaX >50 || deltaY>50 || deltaZ >50) {
-            DisplayLoggingInfo();
-        }
-
-        lastX=x;
-        lastY=y;
-        lastZ=z;
-
-    }
-
-    @Override
-    public void onAccuracyChanged(Sensor sensor, int accuracy) {
-
-    }
-
-    @Override
-    public void onLocationChanged(Location location) {
-
-    }
-
-    @Override
-    public void onStatusChanged(String provider, int status, Bundle extras) {
-
-    }
-
-    @Override
-    public void onProviderEnabled(String provider) {
-
-    }
-
-    @Override
-    public void onProviderDisabled(String provider) {
-
-    }
-
-
-    public Location getLocation() {
-        try {
-            locationManager = (LocationManager)getSystemService(LOCATION_SERVICE);
-
-            // getting GPS status
-            isGPSEnabled = locationManager
-                    .isProviderEnabled(LocationManager.GPS_PROVIDER);
-
-            // getting network status
-            isNetworkEnabled = locationManager
-                    .isProviderEnabled(LocationManager.NETWORK_PROVIDER);
-
-            if (!isGPSEnabled && !isNetworkEnabled) {
-                // no network provider is enabled
-            } else {
-                this.canGetLocation = true;
-                // First get location from Network Provider
-                if (isNetworkEnabled) {
-                    locationManager.requestLocationUpdates(
-                            LocationManager.NETWORK_PROVIDER,
-                            MIN_TIME_BW_UPDATES,
-                            MIN_DISTANCE_CHANGE_FOR_UPDATES, this);
-                    Log.d("Network", "Network");
-                    if (locationManager != null) {
-                        location = locationManager
-                                .getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-                        if (location != null) {
-                            latitude = location.getLatitude();
-                            longitude = location.getLongitude();
-                        }
-                    }
-                }
-                // if GPS Enabled get lat/long using GPS Services
-                if (isGPSEnabled) {
-                    if (location == null) {
-                        locationManager.requestLocationUpdates(
-                                LocationManager.GPS_PROVIDER,
-                                MIN_TIME_BW_UPDATES,
-                                MIN_DISTANCE_CHANGE_FOR_UPDATES, this);
-                        Log.d("GPS Enabled", "GPS Enabled");
-                        if (locationManager != null) {
-                            location = locationManager
-                                    .getLastKnownLocation(LocationManager.GPS_PROVIDER);
-                            if (location != null) {
-                                latitude = location.getLatitude();
-                                longitude = location.getLongitude();
-                            }
-                        }
-                    }
-                }
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        return location;
-    }
-
-
-
 
 
 
@@ -339,4 +210,100 @@ public class BroadcastService extends Service implements SensorEventListener, Lo
         }
     }
 
+    public Location getLocation() {
+        try {
+            locationManager = (LocationManager)getSystemService(LOCATION_SERVICE);
+
+            // getting GPS status
+            isGPSEnabled = locationManager
+                    .isProviderEnabled(LocationManager.GPS_PROVIDER);
+
+            // getting network status
+            isNetworkEnabled = locationManager
+                    .isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+
+
+                if(!isNetworkEnabled)
+                {
+                    //To add the code to enable network programatically
+                }
+                else if(!isGPSEnabled) {
+                    //To add the code to enable GPS programatically
+
+            } else {
+                this.canGetLocation = true;
+                // First get location from Network Provider
+                if (isNetworkEnabled) {
+                    locationManager.requestLocationUpdates(
+                            LocationManager.NETWORK_PROVIDER,
+                            MIN_TIME_BW_UPDATES,
+                            MIN_DISTANCE_CHANGE_FOR_UPDATES, this);
+                    Log.d("Network", "Network");
+                    if (locationManager != null) {
+                        location = locationManager
+                                .getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                        if (location != null) {
+                            latitude = location.getLatitude();
+                            longitude = location.getLongitude();
+                        }
+                    }
+                }
+                // if GPS Enabled get lat/long using GPS Services
+                if (isGPSEnabled) {
+                    if (location == null) {
+                        locationManager.requestLocationUpdates(
+                                LocationManager.GPS_PROVIDER,
+                                MIN_TIME_BW_UPDATES,
+                                MIN_DISTANCE_CHANGE_FOR_UPDATES, this);
+                        Log.d("GPS Enabled", "GPS Enabled");
+                        if (locationManager != null) {
+                            location = locationManager
+                                    .getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                            if (location != null) {
+                                latitude = location.getLatitude();
+                                longitude = location.getLongitude();
+                            }
+                        }
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return location;
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+    }
+
+    @Override
+    public void onLocationChanged(Location location) {
+
+    }
+
+    @Override
+    public void onStatusChanged(String provider, int status, Bundle extras) {
+
+    }
+
+    @Override
+    public void onProviderEnabled(String provider) {
+
+    }
+
+    @Override
+    public void onProviderDisabled(String provider) {
+
+    }
+
+    @Override
+
+    public IBinder onBind(Intent intent) {
+        // TODO: Return the communication channel to the service.
+        throw new UnsupportedOperationException("Not yet implemented");
+    }
 }
